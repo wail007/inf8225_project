@@ -24,24 +24,24 @@ class   HMM:
         self.verbose   = verbose
         
         self.reset()
-        
-        
+
+
     def reset(self):  
         self.pi     = np.ones ([self.n]        , dtype = self.precision) * (1.0 / self.n)
         self.A      = np.ones ([self.n, self.n], dtype = self.precision) * (1.0 / self.n)
-       
-    
+
+
     def logLikelihood(self, observations):
         alpha = self._alpha(observations, self._B(observations))
         return np.log(sum(alpha[-1]))
-        
-    
+
+
     def forwardbackward(self, observations):
         B = self._B(observations)
         p = self._alpha(observations, B) * self._beta(observations, B);
         return p / np.sum(p, axis=1, keepdims=True)
-    
-    
+
+
     def train(self, observations, eps=0.0001):
         B = self._B(observations)
         
@@ -55,9 +55,9 @@ class   HMM:
             if abs(cost - previousCost) < eps:
                 break;
             
-            previousCost = cost            
-            
-    
+            previousCost = cost
+
+
     def _B(self, observations):
         """
         Computes the emission probability 'B'. B[t][i] = P(X{t}=x | W(t)=i).
@@ -69,8 +69,8 @@ class   HMM:
         """
         B = np.random.rand(len(observations), self.n)
         return B / np.sum(B, axis=1, keepdims=True)
-    
-    
+
+
     def _alpha(self, observations, B):
         alpha = np.zeros([len(observations), self.n], dtype = self.precision)
         
@@ -80,8 +80,8 @@ class   HMM:
             alpha[t,:] = np.dot(alpha[t-1,:], self.A) * B[t,:]
                 
         return alpha
-    
-    
+
+
     def _beta(self, observations, B):      
         beta = np.zeros([len(observations),self.n], dtype = self.precision)
         
@@ -92,8 +92,8 @@ class   HMM:
                 beta[t][i] = sum(self.A[i,:]*B[t+1,:]*beta[t+1,:])
                     
         return beta
-    
-    
+
+
     def _xi(self, observations, B, alpha, beta):       
         xi = np.zeros([len(observations), self.n, self.n], dtype=self.precision)
         
@@ -104,36 +104,49 @@ class   HMM:
         return xi
 
 
-    def _gamma(self, observations, xi):        
+    def _gamma(self, observations, xi):
         return np.sum(xi, axis=2)
-        
-    
+
+
     def _updatePi(self, gamma):
         self.pi = gamma[0]
-    
-    
+
+
     def _updateA(self, xi, gamma):
-        self.A = np.sum(xi , axis=0) / np.tile(np.sum(gamma, axis=0), [self.n, 1]).T
-                        
-                
+        #self.A = np.sum(xi , axis=0) / np.tile(np.sum(gamma, axis=0), [self.n, 1]).T
+        
+        numer = np.sum(xi   [0], axis=0)
+        denom = np.sum(gamma[0], axis=0)
+        
+        for i in xrange(1, len(gamma)):
+            numer += np.sum(xi   [i], axis=0)
+            denom += np.sum(gamma[i], axis=0)
+        
+        self.A = numer / np.tile(denom, [self.n, 1]).T
+
+
     def _EStep(self, observations, B):
         stats = {}
         
-        stats['alpha'] = self._alpha(observations, B)
-        stats['beta']  = self._beta (observations, B)
-        stats['xi']    = self._xi   (observations, B, stats['alpha'],stats['beta'])
-        stats['gamma'] = self._gamma(observations, stats['xi'])
+        stats['alpha'] = []
+        stats['beta']  = []
+        stats['xi']    = []
+        stats['gamma'] = []
         
+        for i in xrange(len(observations)):            
+            stats['alpha'].append( self._alpha(observations[i], B[i]) )
+            stats['beta'] .append( self._beta (observations[i], B[i]) )
+            stats['xi']   .append( self._xi   (observations[i], B[i], stats['alpha'][i], stats['beta'][i]) )
+            stats['gamma'].append( self._gamma(observations[i], stats['xi'][i]) )
+
         return stats
-    
-    
+
+
     def _MStep(self, observations, stats):
         self._updatePi(stats['gamma'])
         self._updateA(stats['xi'], stats['gamma'])
         
-    
+
     def _baumWelch(self, observations, B):
         stats = self._EStep(observations, B)
         self._MStep(observations, stats)
-    
-            
