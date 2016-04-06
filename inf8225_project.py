@@ -7,14 +7,17 @@ from HMM import HMM
 
 
 def main():
+    files = os.listdir("data/yes")
     
-    (rate, signal) = wav.read("data/yes/yes0.wav")
+    observations = []
     
-    features = fe.mfcc(signal[:,0], rate)
+    for f in files:
+        (rate, signal) = wav.read(os.path.join("data/yes", f))
+        observations.append( fe.mfcc(signal[:,0], rate) )
     
     hmm = HMM(20)
     
-    hmm.train(features)
+    hmm.train(observations)
 
         
 if __name__ == "__main__":

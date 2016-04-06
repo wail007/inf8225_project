@@ -31,34 +31,47 @@ class   HMM:
         self.A      = np.ones ([self.n, self.n], dtype = self.precision) * (1.0 / self.n)
 
 
-    def logLikelihood(self, observations):
-        alpha = self._alpha(observations, self._B(observations))
-        return np.log(sum(alpha[-1]))
+    def cost(self, observations, B=None):
+        if B is None:
+            B = []
+            for o in observations:
+                B.append( self._B(o) )
+        
+        L = 0      
+        for i in xrange(len(observations)):
+            alpha = self._alpha(observations[i], B[i])
+            L += np.log(sum(alpha[-1]))
+        
+        return -L / len(observations)
 
 
-    def forwardbackward(self, observations):
-        B = self._B(observations)
-        p = self._alpha(observations, B) * self._beta(observations, B);
+    def forwardbackward(self, observation, B=None):
+        if B is None:
+            B = self._B(observation)
+        
+        p = self._alpha(observation, B) * self._beta(observation, B);
         return p / np.sum(p, axis=1, keepdims=True)
 
 
     def train(self, observations, eps=0.0001):
-        B = self._B(observations)
+        B = []
+        for o in observations:
+            B.append( self._B(o) )
         
         previousCost = float("inf");
         
         while True:
             self._baumWelch(observations, B)
             
-            cost = self.logLikelihood(observations)
+            cost = self.logLikelihood(observations, B)
             
-            if abs(cost - previousCost) < eps:
+            if abs(previousCost - cost) < eps:
                 break;
             
             previousCost = cost
 
 
-    def _B(self, observations):
+    def _B(self, observation):
         """
         Computes the emission probability 'B'. B[t][i] = P(X{t}=x | W(t)=i).
         It is the probability of observing symbol 'x' at time 't' given that we are in state 'i'.
@@ -67,54 +80,58 @@ class   HMM:
         
         :returns: (TxN) numpy array. All probabilities are uniform. Deriving classes should override this method.
         """
-        B = np.random.rand(len(observations), self.n)
+        B = np.random.rand(len(observation), self.n)
         return B / np.sum(B, axis=1, keepdims=True)
 
 
-    def _alpha(self, observations, B):
-        alpha = np.zeros([len(observations), self.n], dtype = self.precision)
+    def _alpha(self, observation, B):
+        alpha = np.zeros([len(observation), self.n], dtype = self.precision)
         
         alpha[0,:] = self.pi * B[0,:]
         
-        for t in xrange(1, len(observations)):
+        for t in xrange(1, len(observation)):
             alpha[t,:] = np.dot(alpha[t-1,:], self.A) * B[t,:]
                 
         return alpha
 
 
-    def _beta(self, observations, B):      
-        beta = np.zeros([len(observations),self.n], dtype = self.precision)
+    def _beta(self, observation, B):      
+        beta = np.zeros([len(observation),self.n], dtype = self.precision)
         
         beta[-1,:] = 1.
         
-        for t in xrange(len(observations)-2,-1,-1):
+        for t in xrange(len(observation)-2,-1,-1):
             for i in xrange(self.n):
                 beta[t][i] = sum(self.A[i,:]*B[t+1,:]*beta[t+1,:])
                     
         return beta
 
 
-    def _xi(self, observations, B, alpha, beta):       
-        xi = np.zeros([len(observations), self.n, self.n], dtype=self.precision)
+    def _xi(self, observation, B, alpha, beta):       
+        xi = np.zeros([len(observation), self.n, self.n], dtype=self.precision)
         
-        for t in xrange(len(observations)-1):
+        for t in xrange(len(observation)-1):
             numerator = self.A * np.tile(B[t+1]*beta[t+1], [self.n,1]) * np.tile(alpha[t], [self.n,1]).T
             xi[t] = numerator / np.sum(numerator)
         
         return xi
 
 
-    def _gamma(self, observations, xi):
+    def _gamma(self, xi):
         return np.sum(xi, axis=2)
 
 
     def _updatePi(self, gamma):
-        self.pi = gamma[0]
+        self.pi = gamma[0][0]
+        
+        for i in xrange(1, len(gamma)):
+            self.pi += gamma[i][0]
+            
+        self.pi /= len(gamma)
 
 
     def _updateA(self, xi, gamma):
         #self.A = np.sum(xi , axis=0) / np.tile(np.sum(gamma, axis=0), [self.n, 1]).T
-        
         numer = np.sum(xi   [0], axis=0)
         denom = np.sum(gamma[0], axis=0)
         
@@ -137,7 +154,7 @@ class   HMM:
             stats['alpha'].append( self._alpha(observations[i], B[i]) )
             stats['beta'] .append( self._beta (observations[i], B[i]) )
             stats['xi']   .append( self._xi   (observations[i], B[i], stats['alpha'][i], stats['beta'][i]) )
-            stats['gamma'].append( self._gamma(observations[i], stats['xi'][i]) )
+            stats['gamma'].append( self._gamma(stats['xi'][i]) )
 
         return stats
 
