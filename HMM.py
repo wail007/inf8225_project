@@ -1,6 +1,6 @@
 import numpy as np
 
-class   HMM:
+class _HMM:
     '''
     Gaussian Mixture Hidden Markov Model    
     
@@ -31,15 +31,13 @@ class   HMM:
         self.A      = np.ones ([self.n, self.n], dtype = self.precision) * (1.0 / self.n)
 
 
-    def cost(self, observations, B=None):
-        if B is None:
-            B = []
-            for o in observations:
-                B.append( self._B(o) )
+    def cost(self, observations, Bs=None):
+        if Bs is None:
+            Bs = self._Bs(observations)
         
         L = 0      
         for i in xrange(len(observations)):
-            alpha = self._alpha(observations[i], B[i])
+            alpha = self._alpha(observations[i], Bs[i])
             L += np.log(sum(alpha[-1]))
         
         return -L / len(observations)
@@ -54,16 +52,14 @@ class   HMM:
 
 
     def train(self, observations, eps=0.0001):
-        B = []
-        for o in observations:
-            B.append( self._B(o) )
+        Bs = self._Bs(observations)
         
         previousCost = float("inf");
         
         while True:
-            self._baumWelch(observations, B)
+            self._baumWelch(observations, Bs)
             
-            cost = self.logLikelihood(observations, B)
+            cost = self.cost(observations, Bs)
             
             if abs(previousCost - cost) < eps:
                 break;
@@ -82,15 +78,23 @@ class   HMM:
         """
         B = np.random.rand(len(observation), self.n)
         return B / np.sum(B, axis=1, keepdims=True)
-
+    
+    
+    def _Bs(self, observations):
+        Bs = []
+        for o in observations:
+            Bs.append( self._B(o) )
+            
+        return Bs
+    
 
     def _alpha(self, observation, B):
         alpha = np.zeros([len(observation), self.n], dtype = self.precision)
         
-        alpha[0,:] = self.pi * B[0,:]
+        alpha[0] = self.pi * B[0]
         
         for t in xrange(1, len(observation)):
-            alpha[t,:] = np.dot(alpha[t-1,:], self.A) * B[t,:]
+            alpha[t] = np.dot(alpha[t-1], self.A) * B[t]
                 
         return alpha
 
@@ -98,11 +102,10 @@ class   HMM:
     def _beta(self, observation, B):      
         beta = np.zeros([len(observation),self.n], dtype = self.precision)
         
-        beta[-1,:] = 1.
+        beta[-1] = 1.0
         
         for t in xrange(len(observation)-2,-1,-1):
-            for i in xrange(self.n):
-                beta[t][i] = sum(self.A[i,:]*B[t+1,:]*beta[t+1,:])
+            beta[t] = np.dot(self.A, B[t+1] * beta[t+1])
                     
         return beta
 
@@ -142,7 +145,7 @@ class   HMM:
         self.A = numer / np.tile(denom, [self.n, 1]).T
 
 
-    def _EStep(self, observations, B):
+    def _EStep(self, observations, Bs):
         stats = {}
         
         stats['alpha'] = []
@@ -151,9 +154,9 @@ class   HMM:
         stats['gamma'] = []
         
         for i in xrange(len(observations)):            
-            stats['alpha'].append( self._alpha(observations[i], B[i]) )
-            stats['beta'] .append( self._beta (observations[i], B[i]) )
-            stats['xi']   .append( self._xi   (observations[i], B[i], stats['alpha'][i], stats['beta'][i]) )
+            stats['alpha'].append( self._alpha(observations[i], Bs[i]) )
+            stats['beta'] .append( self._beta (observations[i], Bs[i]) )
+            stats['xi']   .append( self._xi   (observations[i], Bs[i], stats['alpha'][i], stats['beta'][i]) )
             stats['gamma'].append( self._gamma(stats['xi'][i]) )
 
         return stats
@@ -164,6 +167,6 @@ class   HMM:
         self._updateA(stats['xi'], stats['gamma'])
         
 
-    def _baumWelch(self, observations, B):
-        stats = self._EStep(observations, B)
+    def _baumWelch(self, observations, Bs):
+        stats = self._EStep(observations, Bs)
         self._MStep(observations, stats)
