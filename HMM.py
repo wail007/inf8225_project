@@ -8,7 +8,6 @@ class _HMM:
     
     W(i): state of hidden variable W at time i. 
     X(i): observed symbol at time i
-    
     '''
     def __init__(self, n, precision = np.double, verbose = False):
         """
@@ -17,13 +16,11 @@ class _HMM:
         :param n        : number of hidden states of the hidden variable W
         :param precision: precision of the parameters, default is double
         :param verbose  : flag for printing progress information when learning, deafault is False
-        """     
+        """
         self.n = n
         
         self.precision = precision
         self.verbose   = verbose
-        
-        self.reset()
 
 
     def reset(self):  
@@ -52,6 +49,7 @@ class _HMM:
 
 
     def train(self, observations, eps=0.0001):
+        self._initParam(observations)
         Bs = self._Bs(observations)
         
         previousCost = float("inf");
@@ -65,6 +63,10 @@ class _HMM:
                 break;
             
             previousCost = cost
+            
+            
+    def _initParam(self, observations):
+        return
 
 
     def _B(self, observation):
@@ -91,22 +93,25 @@ class _HMM:
     def _alpha(self, observation, B):
         alpha = np.zeros([len(observation), self.n], dtype = self.precision)
         
-        alpha[0] = self.pi * B[0]
+        alpha[0]  = self.pi * B[0]
+        alpha[0] /= np.sum(alpha[0])
         
         for t in xrange(1, len(observation)):
-            alpha[t] = np.dot(alpha[t-1], self.A) * B[t]
-                
+            alpha[t]  = np.dot(alpha[t-1], self.A) * B[t]
+            alpha[t] /= np.sum(alpha[t])
+        
         return alpha
 
 
     def _beta(self, observation, B):      
         beta = np.zeros([len(observation),self.n], dtype = self.precision)
         
-        beta[-1] = 1.0
+        beta[-1] = 1.0/self.n
         
         for t in xrange(len(observation)-2,-1,-1):
             beta[t] = np.dot(self.A, B[t+1] * beta[t+1])
-                    
+            beta[t] /= np.sum(beta[t])
+        
         return beta
 
 

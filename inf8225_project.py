@@ -1,21 +1,20 @@
 import os
-import numpy as np
 import scipy.io.wavfile as wav
 import featureExtraction as fe
-from HMM import HMM
+from GMHMM import GMHMM
 
 
 
 def main():
-    files = os.listdir("data/yes")
+    files = os.listdir("data")
     
     observations = []
     
     for f in files:
-        (rate, signal) = wav.read(os.path.join("data/yes", f))
-        observations.append( fe.mfcc(signal[:,0], rate) )
+        (rate, signal) = wav.read(os.path.join("data", f))
+        observations.append( fe.mfcc(signal, rate) )
     
-    hmm = HMM(20)
+    hmm = GMHMM(20, 10, 13)
     
     hmm.train(observations)
 
