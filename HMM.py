@@ -57,7 +57,7 @@ class HMM:
         return p / np.sum(p, axis=1, keepdims=True)
 
 
-    def train(self, observations, eps=0.0001):
+    def train(self, observations, eps=0.00001):
         Bs = self._Bs(observations)
         
         previousCost = float("inf");
@@ -66,6 +66,7 @@ class HMM:
             self._baumWelch(observations, Bs)
             
             cost = self.cost(observations, Bs)
+            print cost
             
             if abs(previousCost - cost) < eps:
                 break;
@@ -129,27 +130,36 @@ class HMM:
         return np.sum(xi, axis=2)
 
 
-    def _updatePi(self, gamma):
-        self.pi = gamma[0][0]
+    def _updatePi(self, gammas):
+        self.pi = gammas[0][0]
         
-        for i in xrange(1, len(gamma)):
-            self.pi += gamma[i][0]
+        for i in xrange(1, len(gammas)):
+            self.pi += gammas[i][0]
             
-        self.pi /= len(gamma)
+        self.pi /= len(gammas)
 
 
-    def _updateA(self, xi, gamma):
+    def _updateA(self, xis, gammas):
         #self.A = np.sum(xi , axis=0) / np.tile(np.sum(gamma, axis=0), [self.n, 1]).T
-        numer = np.sum(xi   [0], axis=0)
-        denom = np.sum(gamma[0], axis=0)
+        numer = np.sum(xis   [0], axis=0)
+        denom = np.sum(gammas[0], axis=0)
         
-        for i in xrange(1, len(gamma)):
-            numer += np.sum(xi   [i], axis=0)
-            denom += np.sum(gamma[i], axis=0)
+        for i in xrange(1, len(gammas)):
+            numer += np.sum(xis   [i], axis=0)
+            denom += np.sum(gammas[i], axis=0)
         
         self.A = numer / np.tile(denom, [self.n, 1]).T
         
-    def _updateB(self, observations, gamma):
+    def _updateB(self, observations, gammas):
+        symbols = np.tile(np.arange(self.m), [len(observations[0]), 1])
+        y = symbols == observations[0]
+        numer = np.dot(gammas[0], y)
+        
+        denom = np.sum(gammas[0], axis=0)
+        
+        for i in xrange(1, len(observations)):
+            denom += np.sum(gammas[i], axis=0)
+        
         self.B = np.zeros( (self.n,self.m) ,dtype=self.precision)
         
         for j in xrange(self.n):
@@ -159,8 +169,8 @@ class HMM:
                 for i in xrange(len(observations)):
                     for t in xrange(len(observations[i])):
                         if observations[i][t] == k:
-                            numer += gamma[i][t][j]
-                        denom += gamma[i][t][j]
+                            numer += gammas[i][t][j]
+                        denom += gammas[i][t][j]
                 self.B[j][k] = numer/denom
 
 

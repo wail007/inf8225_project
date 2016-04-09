@@ -15,10 +15,10 @@ def main():
         (rate, signal) = wav.read(os.path.join("data", f))
         observations.append( fe.mfcc(signal, rate) )
     
-    codeBook = cb.makeCodeBook(observations, 32)
+    codeBook = cb.makeCodeBook(observations, 256)
     obsCodes = cb.getCodes(observations, codeBook)
     
-    hmm = HMM(20, 32)
+    hmm = HMM(512, 256)
     
     hmm.train(obsCodes)
 

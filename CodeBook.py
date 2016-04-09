@@ -11,6 +11,8 @@ def makeCodeBook(observations, symbolCount):
     
     [codebook, distortion] = vq.kmeans(obs, symbolCount)
     
+    print distortion
+    
     return codebook
 
 
