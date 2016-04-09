@@ -1,7 +1,8 @@
 import os
 import scipy.io.wavfile as wav
 import featureExtraction as fe
-from GMHMM import GMHMM
+from HMM import HMM
+import CodeBook as cb
 
 
 
@@ -14,9 +15,12 @@ def main():
         (rate, signal) = wav.read(os.path.join("data", f))
         observations.append( fe.mfcc(signal, rate) )
     
-    hmm = GMHMM(20, 10, 13)
+    codeBook = cb.makeCodeBook(observations, 32)
+    obsCodes = cb.getCodes(observations, codeBook)
     
-    hmm.train(observations)
+    hmm = HMM(20, 32)
+    
+    hmm.train(obsCodes)
 
         
 if __name__ == "__main__":

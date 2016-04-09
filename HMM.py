@@ -1,6 +1,6 @@
 import numpy as np
 
-class _HMM:
+class HMM:
     '''
     Gaussian Mixture Hidden Markov Model    
     
@@ -9,7 +9,7 @@ class _HMM:
     W(i): state of hidden variable W at time i. 
     X(i): observed symbol at time i
     '''
-    def __init__(self, n, precision = np.double, verbose = False):
+    def __init__(self, n, m, precision=np.double, verbose=False):
         """
         Constructor
         
@@ -18,14 +18,23 @@ class _HMM:
         :param verbose  : flag for printing progress information when learning, deafault is False
         """
         self.n = n
+        self.m = m
         
         self.precision = precision
         self.verbose   = verbose
+        
+        self.reset()
 
 
     def reset(self):  
-        self.pi     = np.ones ([self.n]        , dtype = self.precision) * (1.0 / self.n)
-        self.A      = np.ones ([self.n, self.n], dtype = self.precision) * (1.0 / self.n)
+        self.pi  = np.random.rand(self.n)
+        self.pi /= np.sum(self.pi, keepdims=True)
+
+        self.A  = np.random.rand(self.n, self.n)
+        self.A /= np.sum(self.A, axis=1, keepdims=True)
+        
+        self.B  = np.random.rand(self.n, self.m)
+        self.B /= np.sum(self.B, axis=1, keepdims=True)
 
 
     def cost(self, observations, Bs=None):
@@ -42,14 +51,13 @@ class _HMM:
 
     def forwardbackward(self, observation, B=None):
         if B is None:
-            B = self._B(observation)
+            B = self._Bmap(observation)
         
         p = self._alpha(observation, B) * self._beta(observation, B);
         return p / np.sum(p, axis=1, keepdims=True)
 
 
     def train(self, observations, eps=0.0001):
-        self._initParam(observations)
         Bs = self._Bs(observations)
         
         previousCost = float("inf");
@@ -63,13 +71,9 @@ class _HMM:
                 break;
             
             previousCost = cost
-            
-            
-    def _initParam(self, observations):
-        return
 
 
-    def _B(self, observation):
+    def _Bmap(self, observation):
         """
         Computes the emission probability 'B'. B[t][i] = P(X{t}=x | W(t)=i).
         It is the probability of observing symbol 'x' at time 't' given that we are in state 'i'.
@@ -78,27 +82,24 @@ class _HMM:
         
         :returns: (TxN) numpy array. All probabilities are uniform. Deriving classes should override this method.
         """
-        B = np.random.rand(len(observation), self.n)
-        return B / np.sum(B, axis=1, keepdims=True)
-    
-    
+        return self.B[:, observation].T
+
+
     def _Bs(self, observations):
         Bs = []
         for o in observations:
-            Bs.append( self._B(o) )
+            Bs.append( self._Bmap(o) )
             
         return Bs
     
 
     def _alpha(self, observation, B):
-        alpha = np.zeros([len(observation), self.n], dtype = self.precision)
+        alpha = np.zeros([len(observation), self.n], dtype=self.precision)
         
         alpha[0]  = self.pi * B[0]
-        alpha[0] /= np.sum(alpha[0])
         
         for t in xrange(1, len(observation)):
             alpha[t]  = np.dot(alpha[t-1], self.A) * B[t]
-            alpha[t] /= np.sum(alpha[t])
         
         return alpha
 
@@ -106,11 +107,10 @@ class _HMM:
     def _beta(self, observation, B):      
         beta = np.zeros([len(observation),self.n], dtype = self.precision)
         
-        beta[-1] = 1.0/self.n
+        beta[-1] = 1.0
         
         for t in xrange(len(observation)-2,-1,-1):
             beta[t] = np.dot(self.A, B[t+1] * beta[t+1])
-            beta[t] /= np.sum(beta[t])
         
         return beta
 
@@ -148,6 +148,20 @@ class _HMM:
             denom += np.sum(gamma[i], axis=0)
         
         self.A = numer / np.tile(denom, [self.n, 1]).T
+        
+    def _updateB(self, observations, gamma):
+        self.B = np.zeros( (self.n,self.m) ,dtype=self.precision)
+        
+        for j in xrange(self.n):
+            for k in xrange(self.m):
+                numer = 0.0
+                denom = 0.0
+                for i in xrange(len(observations)):
+                    for t in xrange(len(observations[i])):
+                        if observations[i][t] == k:
+                            numer += gamma[i][t][j]
+                        denom += gamma[i][t][j]
+                self.B[j][k] = numer/denom
 
 
     def _EStep(self, observations, Bs):
@@ -170,6 +184,7 @@ class _HMM:
     def _MStep(self, observations, stats):
         self._updatePi(stats['gamma'])
         self._updateA(stats['xi'], stats['gamma'])
+        self._updateB(observations, stats['gamma'])
         
 
     def _baumWelch(self, observations, Bs):
