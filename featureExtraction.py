@@ -24,7 +24,7 @@ def mfcc(signal,sampleRate,winSize=0.025,winStep=0.01,cepCount=13,filterCount=26
     
     signal = preemphasis(signal, preemph)
     
-    frames = frameSignal(signal, winSize*sampleRate, winStep*sampleRate)
+    frames = frameSignal(signal, winSize*sampleRate, winStep*sampleRate, np.hamming)
     
     pspec = powerSpectrum(frames, fftSize)
     

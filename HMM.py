@@ -36,28 +36,32 @@ class HMM:
         self.B  = np.random.rand(self.n, self.m)
         self.B /= np.sum(self.B, axis=1, keepdims=True)
 
-
+    #ref:http://www.cs.sjsu.edu/~stamp/RUA/HMM.pdf
     def cost(self, observations, Bs=None):
         if Bs is None:
             Bs = self._Bs(observations)
         
         L = 0      
         for i in xrange(len(observations)):
-            alpha = self._alpha(observations[i], Bs[i])
-            L += np.log(sum(alpha[-1]))
+            (alpha, c) = self._alpha(observations[i], Bs[i])
+            L += np.sum(np.log(c))
         
-        return -L / len(observations)
+        return L / len(observations)
 
 
     def forwardbackward(self, observation, B=None):
         if B is None:
             B = self._Bmap(observation)
         
-        p = self._alpha(observation, B) * self._beta(observation, B);
+        (alpha, c) = self._alpha(observation, B)
+        beta       = self._beta (observation, B, c)
+        
+        p = alpha * beta
+        
         return p / np.sum(p, axis=1, keepdims=True)
 
 
-    def train(self, observations, eps=0.00001):
+    def train(self, observations, eps=0.01):
         Bs = self._Bs(observations)
         
         previousCost = float("inf");
@@ -96,22 +100,27 @@ class HMM:
 
     def _alpha(self, observation, B):
         alpha = np.zeros([len(observation), self.n], dtype=self.precision)
+        c     = np.zeros([len(observation)        ], dtype=self.precision)
         
-        alpha[0]  = self.pi * B[0]
+        alpha[0] = self.pi * B[0]
+        c    [0] = 1.0 / np.sum(alpha[0])
+        alpha[0]*= c[0]
         
         for t in xrange(1, len(observation)):
-            alpha[t]  = np.dot(alpha[t-1], self.A) * B[t]
+            alpha[t] = np.dot(alpha[t-1], self.A) * B[t]
+            c    [t] = 1.0 / np.sum(alpha[t])
+            alpha[t]*= c[t]
         
-        return alpha
+        return (alpha, c)
 
 
-    def _beta(self, observation, B):      
+    def _beta(self, observation, B, c):      
         beta = np.zeros([len(observation),self.n], dtype = self.precision)
         
-        beta[-1] = 1.0
+        beta[-1] = 1.0 * c[-1]
         
         for t in xrange(len(observation)-2,-1,-1):
-            beta[t] = np.dot(self.A, B[t+1] * beta[t+1])
+            beta[t] = np.dot(self.A, B[t+1] * beta[t+1]) * c[t]
         
         return beta
 
@@ -151,27 +160,14 @@ class HMM:
         self.A = numer / np.tile(denom, [self.n, 1]).T
         
     def _updateB(self, observations, gammas):
-        symbols = np.tile(np.arange(self.m), [len(observations[0]), 1])
-        y = symbols == observations[0]
-        numer = np.dot(gammas[0], y)
-        
+        numer = np.dot(gammas[0].T, np.tile(np.arange(self.m), [len(observations[0]), 1]) == observations[0][:,None])
         denom = np.sum(gammas[0], axis=0)
         
         for i in xrange(1, len(observations)):
+            numer += np.dot(gammas[i].T, np.tile(np.arange(self.m), [len(observations[i]), 1]) == observations[i][:,None])
             denom += np.sum(gammas[i], axis=0)
-        
-        self.B = np.zeros( (self.n,self.m) ,dtype=self.precision)
-        
-        for j in xrange(self.n):
-            for k in xrange(self.m):
-                numer = 0.0
-                denom = 0.0
-                for i in xrange(len(observations)):
-                    for t in xrange(len(observations[i])):
-                        if observations[i][t] == k:
-                            numer += gammas[i][t][j]
-                        denom += gammas[i][t][j]
-                self.B[j][k] = numer/denom
+            
+        self.B = numer / denom[:,None]
 
 
     def _EStep(self, observations, Bs):
@@ -182,9 +178,11 @@ class HMM:
         stats['xi']    = []
         stats['gamma'] = []
         
-        for i in xrange(len(observations)):            
-            stats['alpha'].append( self._alpha(observations[i], Bs[i]) )
-            stats['beta'] .append( self._beta (observations[i], Bs[i]) )
+        for i in xrange(len(observations)):
+            (alpha, c) = self._alpha(observations[i], Bs[i])
+                    
+            stats['alpha'].append( alpha )
+            stats['beta'] .append( self._beta (observations[i], Bs[i], c) )
             stats['xi']   .append( self._xi   (observations[i], Bs[i], stats['alpha'][i], stats['beta'][i]) )
             stats['gamma'].append( self._gamma(stats['xi'][i]) )
 

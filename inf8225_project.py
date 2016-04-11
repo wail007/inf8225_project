@@ -1,26 +1,38 @@
 import os
+import gzip
+import cPickle
 import scipy.io.wavfile as wav
 import featureExtraction as fe
 from HMM import HMM
 import CodeBook as cb
+from IWR import IWR
+from MakeData import Data
+from numpy import append
 
-
+def load(filename):
+    file = gzip.GzipFile(filename, 'rb')
+    object = cPickle.load(file)
+    file.close()
+    return object
 
 def main():
-    files = os.listdir("data")
+    iwr = IWR(load("data_train_256.cpkl.gz"))    
     
-    observations = []
+    iwr.train()
     
-    for f in files:
-        (rate, signal) = wav.read(os.path.join("data", f))
-        observations.append( fe.mfcc(signal, rate) )
-    
-    codeBook = cb.makeCodeBook(observations, 256)
-    obsCodes = cb.getCodes(observations, codeBook)
-    
-    hmm = HMM(512, 256)
-    
-    hmm.train(obsCodes)
+    signals = []
+    rates   = []
+    y       = []
+    for word in os.listdir("data/test"):
+        path = os.path.join("data/test", word)
+        for sample in os.listdir(path):
+            (rate, signal) = wav.read(os.path.join(path, sample))
+            
+            signals.append((signal[:,0]+signal[:,1])/2)
+            rates  .append(rate)
+            
+    p = iwr.predict(signals, rates)
+    print p
 
         
 if __name__ == "__main__":
