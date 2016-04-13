@@ -2,7 +2,12 @@ import numpy as np
 import CodeBook as cb
 from HMM import HMM
 from featureExtraction import mfcc
-from MakeData import Data
+
+class Data:
+    def __init__(self):
+        self.samples   = []
+        self.codeBooks = []
+        self.words     = []
 
 class IWR:
     
@@ -10,10 +15,10 @@ class IWR:
         self.data    = data
         self.hmmList = []
         
+    def train(self, n):
+        self.hmmList = []
         for i in xrange(len(self.data.words)):
-            self.hmmList.append(HMM(64, len(self.data.codeBooks[i])))        
-        
-    def train(self):
+            self.hmmList.append(HMM(n, len(self.data.codeBooks[i])))
         
         for i in xrange(len(self.data.words)):
             print "Training: {}".format(self.data.words[i])
@@ -33,5 +38,8 @@ class IWR:
                     y[i][j] = self.hmmList[i].cost([observations[j]])
                 
         return np.argmin(y, axis=0)
-            
+    
+    def precision(self, signals, sampleRates, y):
+        return np.sum(y == self.predict(signals, sampleRates)) / float(len(signals))
+        
         

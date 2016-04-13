@@ -2,7 +2,7 @@ import scipy.cluster.vq as vq
 import numpy as np
 
 
-def makeCodeBook(observations, symbolCount):
+def makeCodeBook(observations, symbolCount, verbose=False):
     obs = observations[0]
     for i in xrange(1, len(observations)):
         obs = np.vstack([obs, observations[i]]) 
@@ -11,7 +11,8 @@ def makeCodeBook(observations, symbolCount):
     
     [codebook, distortion] = vq.kmeans(obs, symbolCount)
     
-    print distortion
+    if verbose:
+        print "Distortion: {}".format(distortion)
     
     return codebook
 

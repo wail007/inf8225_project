@@ -6,7 +6,7 @@ import featureExtraction as fe
 from HMM import HMM
 import CodeBook as cb
 from IWR import IWR
-from MakeData import Data
+from MakeTrainingData.py import Data
 from numpy import append
 
 def load(filename):
